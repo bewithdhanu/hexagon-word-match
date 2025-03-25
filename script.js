@@ -35,23 +35,31 @@ class WordSearchGame {
         // Sort words by length (longest first)
         const sortedWords = [...this.words].sort((a, b) => b.length - a.length);
 
-        // Try to place each word
+        // Try to place each word with multiple attempts and different starting positions
         sortedWords.forEach(word => {
             let placed = false;
             let attempts = 0;
-            const maxAttempts = 100;
+            const maxAttempts = 200; // Increased max attempts
 
             while (!placed && attempts < maxAttempts) {
-                // Get random position and direction
                 const row = Math.floor(Math.random() * this.gridSize);
                 const col = Math.floor(Math.random() * this.gridSize);
+                
+                // Get valid directions from current position
                 const directions = this.getValidDirections(row, col);
                 
+                // Shuffle the directions array for more varied placement
+                this.shuffleArray(directions);
+                
                 if (directions.length > 0) {
-                    const direction = directions[Math.floor(Math.random() * directions.length)];
-                    if (this.canPlaceWord(word, row, col, direction)) {
-                        this.placeWordAt(word, row, col, direction);
-                        placed = true;
+                    // Try each direction
+                    for (const direction of directions) {
+                        if (this.canPlaceWord(word, row, col, direction)) {
+                            if (this.placeWordAt(word, row, col, direction)) {
+                                placed = true;
+                                break;
+                            }
+                        }
                     }
                 }
                 attempts++;
@@ -92,6 +100,15 @@ class WordSearchGame {
         }
     }
 
+    // Fisher-Yates shuffle algorithm for randomizing directions
+    shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+        return array;
+    }
+
     getValidDirections(row, col) {
         const isEvenRow = row % 2 === 0;
         
@@ -105,11 +122,28 @@ class WordSearchGame {
             [1, isEvenRow ? -1 : 0]   // down-left
         ];
 
-        // Filter out directions that would lead outside the grid
-        return possibleDirections.filter(([dRow, dCol]) => {
-            const newRow = row + dRow;
-            const newCol = col + dCol;
-            return this.isValidPosition(newRow, newCol);
+        // Add diagonal directions to increase variety
+        // These match the extended neighbor connections in getNeighborPositions
+        const diagonalDirections = [
+            [-2, 0],  // up-up
+            [2, 0],   // down-down
+            [0, 2],   // right-right
+            [0, -2]   // left-left
+        ];
+        
+        const allDirections = [...possibleDirections, ...diagonalDirections];
+
+        // Filter out directions that would lead outside the grid based on word length
+        return allDirections.filter(([dRow, dCol]) => {
+            // Check if any position for this word would be invalid
+            for (let i = 0; i < Math.min(this.words[0].length, this.gridSize); i++) {
+                const newRow = row + (dRow * i);
+                const newCol = col + (dCol * i);
+                if (!this.isValidPosition(newRow, newCol)) {
+                    return false;
+                }
+            }
+            return true;
         });
     }
 
@@ -119,8 +153,9 @@ class WordSearchGame {
 
     canPlaceWord(word, startRow, startCol, direction) {
         const [dRow, dCol] = direction;
+        const positions = [];
         
-        // Check if word fits within grid bounds
+        // Check if all positions are valid and either empty or matching
         for (let i = 0; i < word.length; i++) {
             const row = startRow + (dRow * i);
             const col = startCol + (dCol * i);
@@ -133,6 +168,23 @@ class WordSearchGame {
             if (this.grid[row][col] && this.grid[row][col] !== word[i]) {
                 return false;
             }
+
+            positions.push([row, col]);
+        }
+
+        // Verify consecutive positions are adjacent - critical for diagonal placements
+        for (let i = 1; i < positions.length; i++) {
+            const [prevRow, prevCol] = positions[i - 1];
+            const [currRow, currCol] = positions[i];
+            
+            const neighbors = this.getNeighborPositions(prevRow, prevCol);
+            const isAdjacent = neighbors.some(([nRow, nCol]) => 
+                nRow === currRow && nCol === currCol
+            );
+
+            if (!isAdjacent) {
+                return false;
+            }
         }
 
         return true;
@@ -142,28 +194,29 @@ class WordSearchGame {
         const [dRow, dCol] = direction;
         const positions = [];
         
-        // First, collect all positions where we'll place letters
+        // First, collect all positions
         for (let i = 0; i < word.length; i++) {
             const row = startRow + (dRow * i);
             const col = startCol + (dCol * i);
             positions.push([row, col, word[i]]);
         }
 
-        // Verify all positions are connected in the hexagonal grid
+        // Double-check adjacency
         for (let i = 1; i < positions.length; i++) {
             const [prevRow, prevCol] = positions[i - 1];
             const [currRow, currCol] = positions[i];
             
-            // Create dummy cells to check adjacency
-            const cell1 = { dataset: { row: prevRow, col: prevCol } };
-            const cell2 = { dataset: { row: currRow, col: currCol } };
-            
-            if (!this.isAdjacent(cell1, cell2)) {
+            const neighbors = this.getNeighborPositions(prevRow, prevCol);
+            const isAdjacent = neighbors.some(([nRow, nCol]) => 
+                nRow === currRow && nCol === currCol
+            );
+
+            if (!isAdjacent) {
                 return false;
             }
         }
 
-        // If all positions are valid and connected, place the word
+        // If all checks pass, place the word
         positions.forEach(([row, col, letter]) => {
             this.grid[row][col] = letter;
         });
@@ -210,14 +263,19 @@ class WordSearchGame {
         const isEvenRow = row % 2 === 0;
         const neighbors = [];
 
-        // Define all possible neighbor positions based on hexagonal grid
+        // Define all possible neighbor positions for a hexagonal grid
         const directions = [
             [0, 1],   // right
             [0, -1],  // left
             [-1, isEvenRow ? 0 : 1],  // up-right
             [-1, isEvenRow ? -1 : 0], // up-left
             [1, isEvenRow ? 0 : 1],   // down-right
-            [1, isEvenRow ? -1 : 0]   // down-left
+            [1, isEvenRow ? -1 : 0],  // down-left
+            // Add diagonal connections
+            [-2, 0],  // up-up
+            [2, 0],   // down-down
+            [0, 2],   // right-right
+            [0, -2]   // left-left
         ];
 
         // Add all valid neighbor positions
@@ -331,6 +389,8 @@ class WordSearchGame {
         
         if (this.words.includes(selectedWord) || this.words.includes(reversedWord)) {
             const word = this.words.includes(selectedWord) ? selectedWord : reversedWord;
+            const isReversed = this.words.includes(reversedWord) && !this.words.includes(selectedWord);
+            
             if (!this.foundWords.has(word)) {
                 this.foundWords.add(word);
                 const wordElement = document.querySelector(`[data-word="${word}"]`);
@@ -340,6 +400,16 @@ class WordSearchGame {
                 wordElement.style.animation = 'none';
                 wordElement.offsetHeight; // Trigger reflow
                 wordElement.style.animation = 'flash 0.5s';
+                
+                // Apply permanent color to the found word cells
+                const cellsToHighlight = isReversed ? [...this.selectedCells].reverse() : this.selectedCells;
+                const colors = ['#FFC107', '#4CAF50', '#2196F3', '#9C27B0', '#F44336', '#00BCD4', '#FF9800'];
+                const colorIndex = Array.from(this.foundWords).indexOf(word) % colors.length;
+                const highlightColor = colors[colorIndex];
+                
+                cellsToHighlight.forEach(cell => {
+                    cell.classList.add('filled');
+                });
                 
                 if (this.foundWords.size === this.words.length) {
                     setTimeout(() => alert('Congratulations! You found all the words!'), 100);
@@ -351,4 +421,4 @@ class WordSearchGame {
 
 // Initialize the game with sample words
 const words = ['HELLO', 'WORLD', 'GAME', 'PLAY', 'FUN'];
-new WordSearchGame(words); 
+new WordSearchGame(words);

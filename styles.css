@@ -177,6 +177,13 @@ body {
     background-color: #ff4081;
 }
 
+.letter-cell.filled::before {
+    background-color: #fd9bbc;
+}
+.letter-cell.filled {
+    color: white;
+}
+
 .letter-cell.selected {
     color: white;
 }
