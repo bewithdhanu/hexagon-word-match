@@ -174,7 +174,7 @@ body {
 }
 
 .letter-cell.selected::before {
-    background-color: #ff4081;
+    background-color: #ff4081 !important;
 }
 
 .letter-cell.filled::before {
