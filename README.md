@@ -2,6 +2,8 @@
 
 A modern word search game with a unique hexagonal grid layout. Words can be found by dragging through adjacent hexagonal cells in any direction.
 
+🎮 [Play Live Demo](https://bewithdhanu.github.io/hexagon-word-match/)
+
 ## Features
 
 - Hexagonal grid layout
@@ -28,4 +30,8 @@ A modern word search game with a unique hexagonal grid layout. Words can be foun
 
 - HTML5
 - CSS3 (with modern features like CSS Grid and Custom Properties)
-- Vanilla JavaScript (ES6+) 
+- Vanilla JavaScript (ES6+)
+
+## Live Demo
+
+Try the game now: [https://bewithdhanu.github.io/hexagon-word-match/](https://bewithdhanu.github.io/hexagon-word-match/) 
